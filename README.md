@@ -1,136 +1,184 @@
-# ЛР1 - Рыболовная фирма
+# ЛР1 — Рыболовная фирма
 
-Минимальное приложение для учёта катеров, команд, рейсов, сортов рыбы и улова.
+Минимальная информационная система учета деятельности рыболовной фирмы. Проект разработан по ТЗ из `docs/TECHNICAL_SPECIFICATION.md` и требованиям ЛР1 по дисциплине «Методология и практики DevOps».
 
-## Что реализовано
+## 1. Что реализовано
+
 - HTTP API на FastAPI.
-- Реляционная БД PostgreSQL.
+- Реляционная БД PostgreSQL 17.
 - 5 связанных сущностей: `boats`, `crews`, `fish_types`, `trips`, `catches`.
-- CRUD-подобные операции для основных справочников и добавления рейсов/улова.
-- Health-check: `GET /health`.
-- Валидация входных данных и понятные HTTP-ошибки.
-- Предметное правило: суммарный улов рейса не может превышать грузоподъёмность катера.
+- Проверка внешних ключей при создании рейса и улова.
+- Бизнес-правило: суммарная масса улова рейса не может превышать грузоподъемность катера.
+- Обработка ошибок HTTP 404/409/422.
+- `GET /health` с проверкой соединения с БД.
+- Отчет по рейсам и отчет за период.
 - Конфигурация через переменные окружения.
-- Docker Compose для приложения и БД.
+- Docker Compose для API и PostgreSQL.
 - SQL-схема и начальные данные.
-- Пользовательский веб-интерфейс: `GET /` (катера, команды, сорта рыбы, рейсы, улов и отчёт).
-- Документация HTTP API: `GET /docs`.
-- Схема данных: `docs/DATA_MODEL.md`.
-- Тесты и единый Makefile-интерфейс.
-- CI для push и Pull Request/Merge Request: `.github/workflows/ci.yml`.
+- Тесты и Makefile.
+- Git-процесс: feature-ветка, несколько коммитов, PR/MR, merge, конфликт и тег `v0.1.0`.
 
-Требования ЛР1 предполагают путь `задача → изменение кода → локальные проверки → Git → CI → образ → CD → проверка релиза → наблюдение`; в этой работе на первом этапе реализованы приложение, Git-процесс, локальные проверки и контейнерный запуск.
+## 2. Документы проекта
 
-## Быстрый старт
+- `docs/TECHNICAL_SPECIFICATION.md` — формальное ТЗ.
+- `docs/API.md` — описание API.
+- `docs/DB_SCHEMA.md` — схема БД и связи.
+- `docs/GIT_DEFENSE.md` — сценарий защиты Git.
+- `docs/DEMO.md` — пошаговая демонстрация API.
 
-### Вариант А: Docker Compose (рекомендуется для защиты)
-1. Скопировать `.env.example` в `.env` и задать пароль.
-2. Запустить:
-```bash
-make up
-```
-3. Проверить:
-```bash
-make container-check
-```
-4. Открыть веб-интерфейс: http://localhost:8000/
-5. Документация API: http://localhost:8000/docs
-6. Остановить:
-```bash
-make down
-```
+## 3. Быстрый запуск
 
-### Вариант Б: приложение локально, БД в Docker
 ```bash
 cp .env.example .env
-# установить DATABASE_URL с паролем из .env
 make up
-# в отдельном терминале:
-make run
+make container-check
 ```
-В этом варианте API доступен на http://localhost:8000.
 
-## Основные endpoint'ы
+Swagger UI:
+
+```text
+http://localhost:8000/docs
+```
+
+Проверка:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Ожидается HTTP 200 и JSON с `status = ok`.
+
+### БД
+
+База доступна внутри Docker-сети. Для защиты:
+
+```bash
+docker compose exec db psql -U fishing -d fishing
+```
+
+Внутри:
+
+```sql
+\dt
+SELECT * FROM boats;
+SELECT * FROM crews;
+SELECT * FROM fish_types;
+SELECT * FROM trips;
+SELECT * FROM catches;
+```
+
+## 4. API
+
+### Служебный
+
 - `GET /health`
+
+### Справочники
+
 - `GET/POST /api/boats`
 - `GET/POST /api/crews`
 - `GET/POST /api/fish-types`
+
+### Операционные сущности
+
 - `GET/POST /api/trips`
 - `GET/POST /api/catches`
-- `GET /api/reports/catch-by-period`
+
+### Отчеты
+
 - `GET /api/reports/catch-by-trip`
-- `GET /` — пользовательский веб-интерфейс
+- `GET /api/reports/catch-by-period?date_from=2026-09-01&date_to=2026-09-30`
 
-## Демонстрационный сценарий
-1. Открыть `http://localhost:8000/` и проверить статус API/БД.
-2. Через веб-интерфейс создать/проверить катер, команду и сорт рыбы.
-3. Создать рейс, связав катер и команду.
-4. Добавить улов.
-5. Добавить улов сверх грузоподъёмности — интерфейс должен показать ошибку `422`.
-6. Обновить отчёт по периоду.
-7. Открыть `/docs` и показать соответствующие HTTP endpoint'ы.
-8. Показать `GET /health`.
+Полное описание — в `docs/API.md`.
 
-## Git-процесс для ЛР1
-Основная ветка: `main`. Прямые изменения в `main` запрещены; все изменения принимаются через Pull Request / Merge Request. Новая функция начинается с задачи, затем создаётся `feature/<short-name>`, выполняются осмысленные коммиты, локальные проверки, push и Pull Request/Merge Request. После ревью выполняется merge в `main`.
+## 5. Главное бизнес-правило
 
-Подробная инструкция для реального GitHub/GitLab remote находится в `docs/REMOTE_REPOSITORY.md`, а пример оформленного PR — в `docs/PR-002-LAB-REQUIREMENTS-4-7-8.md`. CI автоматически запускает `make quality` и `make test` на push и PR.
+Для одного рейса:
+
+```text
+SUM(catches.weight_kg) <= boats.capacity_kg
+```
+
+Если новая запись нарушает правило, API отвечает `422`.
+
+## 6. Проверка требований ТЗ
+
+```bash
+make verify
+make container-check
+```
+
+Матрица соответствия «требование → реализация → проверка» находится в приложении А файла `docs/TECHNICAL_SPECIFICATION.md`.
+
+## 7. Git-процесс
+
+Каждая новая функция выполняется по цепочке:
+
+```text
+задача → feature-ветка → несколько коммитов → локальная проверка → push → PR/MR → review → merge → tag
+```
 
 Пример:
+
 ```bash
 git switch main
 git pull --rebase
 git switch -c feature/catch-capacity-rule
-# изменить код
 make verify
 git add .
 git commit -m "feat: validate catch capacity"
 git push -u origin feature/catch-capacity-rule
 ```
-Создать Merge Request/PR, показать diff и результаты проверок, выполнить merge.
 
-## Схема данных
-Полная ER-схема с описанием связей: `docs/DATA_MODEL.md`.
+После ревью выполняется merge в `main`.
 
-## Искусственное разрешение конфликта
+## 8. Конфликт слияния
+
 ```bash
 git switch main
-git pull
 git switch -c conflict-demo
-# изменить одну строку README.md и commit
-# в main изменить ту же строку и commit
-# затем:
+# изменить одну строку README.md и сделать commit
+# в main изменить ту же строку и сделать commit
 git switch conflict-demo
 git merge main
 ```
-Появятся маркеры `<<<<<<<`, `=======`, `>>>>>>>`. Исправить файл вручную, затем:
+
+После возникновения конфликта исправить файл и:
+
 ```bash
 git add README.md
 git commit -m "chore: resolve merge conflict"
 ```
-После демонстрации можно удалить ветку.
 
-## Версия
+## 9. Версия
+
 ```bash
 git tag -a v0.1.0 -m "ЛР1: первая минимально рабочая версия"
 git push origin v0.1.0
 ```
 
-## Что НЕ должно попасть в Git
-- `.env`
-- секреты и пароли
-- виртуальное окружение `.venv/`
-- кеши Python
-- локальные файлы IDE
+## 10. Что не должно попасть в Git
+
+`.env`, `.venv/`, кэши Python, `backup.sql`, локальные файлы IDE и другие служебные файлы.
 
 Проверка:
+
 ```bash
-git status --ignored
 git ls-files .env
 ```
-Вторая команда не должна выводить `.env`.
 
-## Команды Makefile
-Командный интерфейс соответствует рекомендованной методичкой схеме: `make setup`, `make run`, `make test`, `make quality`, `make migrate`, `make backup`, `make restore`, `make verify`, `make up`, `make down`, `make container-check`.
+Команда не должна выводить `.env`.
 
-ЛР1: реализовано правило ограничения улова грузоподъемностью катера.
+## 11. Команды Makefile
+
+- `make setup`
+- `make run`
+- `make test`
+- `make quality`
+- `make migrate`
+- `make backup`
+- `make restore`
+- `make verify`
+- `make up`
+- `make down`
+- `make container-check`
