@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Рыболовная фирма — панель учёта</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <p class="eyebrow">Лабораторная работа №1</p>
+    <h1>Рыболовная фирма</h1>
+    <p class="subtitle">Учёт катеров, команд, рейсов, рыбы и улова</p>
+  </div>
+  <div class="status"><span id="health-dot" class="dot"></span><span id="health-text">Проверка БД…</span></div>
+</header>
+
+<main class="container">
+  <section class="hero">
+    <div>
+      <h2>Рабочая панель</h2>
+      <p>Все формы ниже работают через HTTP API. Основное правило предметной области: суммарный улов рейса не может превышать грузоподъёмность катера.</p>
+    </div>
+    <a class="api-link" href="/docs" target="_blank" rel="noreferrer">Открыть документацию API →</a>
+  </section>
+
+  <div id="message" class="message hidden"></div>
+
+  <section class="grid two">
+    <article class="card">
+      <h3>Новый катер</h3>
+      <form id="boat-form" class="form">
+        <label>Название<input name="name" minlength="2" maxlength="100" required></label>
+        <label>Регистрационный номер<input name="registration_no" minlength="2" maxlength="50" required></label>
+        <label>Грузоподъёмность, кг<input name="capacity_kg" type="number" min="0.01" step="0.01" required></label>
+        <button>Добавить катер</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Новая команда</h3>
+      <form id="crew-form" class="form">
+        <label>Название<input name="name" minlength="2" maxlength="100" required></label>
+        <label>Капитан<input name="captain" minlength="2" maxlength="100" required></label>
+        <button>Добавить команду</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Новый сорт рыбы</h3>
+      <form id="fish-form" class="form">
+        <label>Название<input name="name" minlength="2" maxlength="100" required></label>
+        <label>Латинское название<input name="latin_name" maxlength="120"></label>
+        <button>Добавить сорт</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Новый рейс</h3>
+      <form id="trip-form" class="form">
+        <label>Катер<select name="boat_id" id="boat-select" required></select></label>
+        <label>Команда<select name="crew_id" id="crew-select" required></select></label>
+        <label>Дата выхода<input name="departure_date" type="date" required></label>
+        <label>Дата возвращения<input name="return_date" type="date"></label>
+        <label>Примечание<textarea name="notes" rows="2"></textarea></label>
+        <button>Создать рейс</button>
+      </form>
+    </article>
+  </section>
+
+  <section class="card">
+    <div class="section-heading"><div><h3>Добавить улов</h3><p>При превышении грузоподъёмности API вернёт ошибку 422.</p></div></div>
+    <form id="catch-form" class="form inline-form">
+      <label>Рейс<select name="trip_id" id="trip-select" required></select></label>
+      <label>Сорт рыбы<select name="fish_type_id" id="fish-select" required></select></label>
+      <label>Банки<input name="cans" type="number" min="1" step="1" required></label>
+      <label>Вес, кг<input name="weight_kg" type="number" min="0.01" step="0.01" required></label>
+      <button>Добавить улов</button>
+    </form>
+  </section>
+
+  <section class="grid two">
+    <article class="card">
+      <div class="section-heading"><h3>Катера</h3><button class="secondary" id="reload-boats">Обновить</button></div>
+      <div id="boats-list" class="table-wrap"></div>
+    </article>
+    <article class="card">
+      <div class="section-heading"><h3>Команды</h3><button class="secondary" id="reload-crews">Обновить</button></div>
+      <div id="crews-list" class="table-wrap"></div>
+    </article>
+    <article class="card">
+      <div class="section-heading"><h3>Сорта рыбы</h3><button class="secondary" id="reload-fish">Обновить</button></div>
+      <div id="fish-list" class="table-wrap"></div>
+    </article>
+    <article class="card">
+      <div class="section-heading"><h3>Рейсы</h3><button class="secondary" id="reload-trips">Обновить</button></div>
+      <div id="trips-list" class="table-wrap"></div>
+    </article>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div><h3>Отчёт по улову за период</h3><p>Показывает суммарный вес улова по рейсам.</p></div>
+      <button class="secondary" id="reload-report">Обновить отчёт</button>
+    </div>
+    <div class="form report-form">
+      <label>С даты<input id="report-from" type="date"></label>
+      <label>По дату<input id="report-to" type="date"></label>
+    </div>
+    <div id="report-list" class="table-wrap"></div>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,114 +1,56 @@
 # Быстрая демонстрация через curl
 
-После `make up`.
-
-## 1. Служебная проверка
+После `make up`:
 
 ```bash
 curl -s http://localhost:8000/health
+curl -s http://localhost:8000/api/boats
+curl -s http://localhost:8000/api/crews
+curl -s http://localhost:8000/api/fish-types
 ```
 
-## 2. Аутентификация
-
-В `.env` заданы `ADMIN_USERNAME` и `ADMIN_PASSWORD`.
+Создать сущности:
 
 ```bash
-source .env
-curl -s -X POST http://localhost:8000/auth/login \
-  -u "$ADMIN_USERNAME:$ADMIN_PASSWORD"
+curl -s -X POST http://localhost:8000/api/boats -H 'Content-Type: application/json' -d '{"name":"Океан","registration_no":"RF-100","capacity_kg":1000}'
+curl -s -X POST http://localhost:8000/api/crews -H 'Content-Type: application/json' -d '{"name":"Команда Восток","captain":"Сидоров С.С."}'
+curl -s -X POST http://localhost:8000/api/fish-types -H 'Content-Type: application/json' -d '{"name":"Минтай","latin_name":"Gadus chalcogrammus"}'
 ```
 
-Проверить текущего пользователя:
+Создать рейс (проверьте ID в предыдущих ответах):
 
 ```bash
-curl -s http://localhost:8000/auth/me \
-  -u "$ADMIN_USERNAME:$ADMIN_PASSWORD"
+curl -s -X POST http://localhost:8000/api/trips -H 'Content-Type: application/json' -d '{"boat_id":1,"crew_id":1,"departure_date":"2026-09-01","return_date":"2026-09-05","notes":"Пробный рейс"}'
 ```
 
-Проверить защиту без логина и пароля:
+Добавить улов:
 
 ```bash
-curl -i http://localhost:8000/api/boats
+curl -s -X POST http://localhost:8000/api/catches -H 'Content-Type: application/json' -d '{"trip_id":1,"fish_type_id":1,"cans":50,"weight_kg":700}'
 ```
 
-Проверить отказ с неправильным паролем:
+Попробовать превысить грузоподъёмность:
 
 ```bash
-curl -i http://localhost:8000/api/boats \
-  -u "$ADMIN_USERNAME:wrong-password"
+curl -s -X POST http://localhost:8000/api/catches -H 'Content-Type: application/json' -d '{"trip_id":1,"fish_type_id":1,"cans":50,"weight_kg":400}'
 ```
+Ожидается HTTP 422 с сообщением о превышении грузоподъёмности.
 
-Проверить успешный доступ:
+Отчёт:
 
 ```bash
-curl -s http://localhost:8000/api/boats \
-  -u "$ADMIN_USERNAME:$ADMIN_PASSWORD"
+curl -s http://localhost:8000/api/reports/catch-by-trip
 ```
+## Health check
 
-Ожидается `401 Unauthorized`.
+Проверка работоспособности API:
 
-## 3. Работа с защищенным API
+```text
+GET http://localhost:8000/health
 
-Для всех защищенных запросов используйте те же логин и пароль.
+Пример запроса:
 
 ```bash
-source .env
-AUTH="-u $ADMIN_USERNAME:$ADMIN_PASSWORD"
-
-curl -s http://localhost:8000/api/boats $AUTH
-curl -s http://localhost:8000/api/crews $AUTH
-curl -s http://localhost:8000/api/fish-types $AUTH
+curl http://localhost:8000/health
 ```
-
-## 4. Создать сущности
-
-```bash
-curl -s -X POST http://localhost:8000/api/boats $AUTH \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Океан","registration_no":"RF-100","capacity_kg":1000}'
-
-curl -s -X POST http://localhost:8000/api/crews $AUTH \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Команда Восток","captain":"Сидоров С.С."}'
-
-curl -s -X POST http://localhost:8000/api/fish-types $AUTH \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Минтай","latin_name":"Gadus chalcogrammus"}'
-```
-
-## 5. Рейс и улов
-
-```bash
-curl -s -X POST http://localhost:8000/api/trips $AUTH \
-  -H 'Content-Type: application/json' \
-  -d '{"boat_id":1,"crew_id":1,"departure_date":"2026-09-01","return_date":"2026-09-05","notes":"Пробный рейс"}'
-
-curl -s -X POST http://localhost:8000/api/catches $AUTH \
-  -H 'Content-Type: application/json' \
-  -d '{"trip_id":1,"fish_type_id":1,"cans":50,"weight_kg":700}'
-```
-
-Попробовать превысить грузоподъемность:
-
-```bash
-curl -s -X POST http://localhost:8000/api/catches $AUTH \
-  -H 'Content-Type: application/json' \
-  -d '{"trip_id":1,"fish_type_id":1,"cans":50,"weight_kg":400}'
-```
-
-Ожидается HTTP 422.
-
-## 6. Отчеты
-
-```bash
-curl -s http://localhost:8000/api/reports/catch-by-trip $AUTH
-curl -s 'http://localhost:8000/api/reports/catch-by-period?date_from=2026-09-01&date_to=2026-09-30' $AUTH
-```
-
-Проверка ошибки диапазона:
-
-```bash
-curl -i 'http://localhost:8000/api/reports/catch-by-period?date_from=2026-09-30&date_to=2026-09-01' $AUTH
-```
-
-Ожидается HTTP 422.
+Ожидаемый HTTP-код: 200

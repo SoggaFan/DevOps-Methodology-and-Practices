@@ -4,34 +4,6 @@ Base URL: `http://localhost:8000`
 
 Документация FastAPI: `GET /docs` и `GET /openapi.json`.
 
-## Аутентификация
-
-Бизнес-операции API защищены HTTP Basic. Для входа используется учетная запись администратора, созданная при старте приложения из переменных окружения `ADMIN_USERNAME` и `ADMIN_PASSWORD`. Пароль хранится в БД только в виде хеша scrypt.
-
-### POST `/auth/login`
-
-Проверяет логин и пароль из HTTP Basic.
-
-Пример:
-```bash
-curl -s -X POST http://localhost:8000/auth/login \
-  -u 'admin:change_me_admin'
-```
-
-Успешный ответ содержит `id`, `username` и `is_active`.
-
-### GET `/auth/me`
-
-Возвращает текущего пользователя и требует HTTP Basic credentials.
-
-Пример:
-```bash
-curl -s http://localhost:8000/auth/me \
-  -u 'admin:change_me_admin'
-```
-
-Все `/api/*` endpoints требуют корректные учетные данные. Без них или при неверном пароле возвращается HTTP 401.
-
 ## Служебный endpoint
 
 ### GET `/health`
@@ -121,7 +93,6 @@ curl -s http://localhost:8000/auth/me \
 
 ## Коды ошибок
 
-- `401` — отсутствует или неверный логин/пароль;
 - `404` — связанная сущность не найдена;
 - `409` — дубликат уникального значения;
 - `422` — ошибка валидации или превышение грузоподъемности.
