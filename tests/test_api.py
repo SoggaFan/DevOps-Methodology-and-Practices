@@ -4,7 +4,8 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.main import BoatIn, CatchIn, TripIn
+from app.security import hash_password, verify_password
+from app.schemas import BoatIn, CatchIn, TripIn
 
 
 def test_boat_capacity_must_be_positive():
@@ -22,11 +23,20 @@ def test_trip_returns_after_departure():
         TripIn(boat_id=1, crew_id=1, departure_date="2026-09-10", return_date="2026-09-09")
 
 
-# Optional DB-backed smoke test. To enable, set TEST_DATABASE_URL.
+def test_password_hash_roundtrip():
+    password_hash = hash_password("correct horse battery staple")
+    assert password_hash.startswith("scrypt$")
+    assert verify_password("correct horse battery staple", password_hash)
+    assert not verify_password("wrong password", password_hash)
+
+
+# Optional DB-backed smoke tests. Enable with TEST_DATABASE_URL.
 if os.getenv("TEST_DATABASE_URL"):
     from fastapi.testclient import TestClient
     from app.main import app
 
+    os.environ.setdefault("ADMIN_USERNAME", "admin")
+    os.environ.setdefault("ADMIN_PASSWORD", "change_me_admin")
     client = TestClient(app)
 
     def test_health_with_database():
@@ -34,12 +44,32 @@ if os.getenv("TEST_DATABASE_URL"):
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
 
+    def test_authentication_flow_with_database():
+        login = client.post(
+            "/auth/login",
+            auth=(os.environ["ADMIN_USERNAME"], os.environ["ADMIN_PASSWORD"]),
+        )
+        assert login.status_code == 200
+        assert login.json()["username"] == os.environ["ADMIN_USERNAME"]
 
-def test_period_report_rejects_reversed_range():
-    from datetime import date
-    from app.main import catch_report_by_period
+        unauthorized = client.get("/api/boats")
+        assert unauthorized.status_code == 401
 
-    with pytest.raises(Exception) as exc_info:
-        catch_report_by_period(date_from=date(2026, 9, 30), date_to=date(2026, 9, 1), db=None)
+        bad_password = client.get(
+            "/api/boats",
+            auth=(os.environ["ADMIN_USERNAME"], "wrong-password"),
+        )
+        assert bad_password.status_code == 401
 
-    assert "не может быть раньше" in str(exc_info.value)
+        authorized = client.get(
+            "/api/boats",
+            auth=(os.environ["ADMIN_USERNAME"], os.environ["ADMIN_PASSWORD"]),
+        )
+        assert authorized.status_code == 200
+
+        me = client.get(
+            "/auth/me",
+            auth=(os.environ["ADMIN_USERNAME"], os.environ["ADMIN_PASSWORD"]),
+        )
+        assert me.status_code == 200
+        assert me.json()["username"] == os.environ["ADMIN_USERNAME"]

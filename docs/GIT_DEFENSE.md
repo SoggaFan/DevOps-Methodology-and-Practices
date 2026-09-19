@@ -60,17 +60,24 @@ curl http://localhost:8000/health
 ```
 Затем показать Swagger, таблицы БД и PR/MR.
 
-### Health-check
+## 11. Как связать защиту с ТЗ
 
-Для демонстрации работоспособности API используется служебный endpoint:
+Открыть `docs/TECHNICAL_SPECIFICATION.md` и показать матрицу трассируемости в приложении А.
+
+На примере FR-07 рассказать цепочку:
 
 ```text
-GET /health
+FR-07 из ТЗ
+  ↓
+create_catch() в app/main.py
+  ↓
+SUM(catches.weight_kg) + новый вес
+  ↓
+сравнение с boats.capacity_kg
+  ↓
+HTTP 422 при превышении
+  ↓
+ручная проверка через Swagger/curl
 ```
-Ожидаемый HTTP-код: 200.
 
-Пример проверки:
-
-```bash
-curl http://localhost:8000/health
-```
+После этого показать FR-09 через `GET /api/reports/catch-by-period`.
