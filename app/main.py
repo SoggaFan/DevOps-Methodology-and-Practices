@@ -2,10 +2,13 @@ import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Generator
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
@@ -83,16 +86,9 @@ class Catch(Base):
 
 
 def ensure_admin_user(db: Session) -> None:
-    user = db.scalar(select(User).where(User.username == ADMIN_USERNAME))
-    if user:
+    if db.scalar(select(User).where(User.username == ADMIN_USERNAME)):
         return
-    db.add(
-        User(
-            username=ADMIN_USERNAME,
-            password_hash=hash_password(ADMIN_PASSWORD),
-            is_active=True,
-        )
-    )
+    db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), is_active=True))
     db.commit()
 
 
@@ -106,6 +102,13 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Fishing Firm API", version="0.2.0", lifespan=lifespan)
 basic_security = HTTPBasic()
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def web_interface():
+    return FileResponse(WEB_DIR / "index.html")
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -231,6 +234,45 @@ def create_catch(payload: CatchIn, db: Session = Depends(get_db), _: User = Depe
     return item
 
 
+@app.get("/api/reports/catch-by-period")
+def catch_report_by_period(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    if date_from and date_to and date_to < date_from:
+        raise HTTPException(422, "Дата окончания периода не может быть раньше даты начала")
+
+    stmt = (
+        select(
+            Trip.id,
+            Boat.name,
+            Trip.departure_date,
+            func.coalesce(func.sum(Catch.weight_kg), 0).label("total_weight_kg"),
+        )
+        .join(Boat, Boat.id == Trip.boat_id)
+        .outerjoin(Catch, Catch.trip_id == Trip.id)
+        .group_by(Trip.id, Boat.name, Trip.departure_date)
+        .order_by(Trip.departure_date, Trip.id)
+    )
+    if date_from:
+        stmt = stmt.where(Trip.departure_date >= date_from)
+    if date_to:
+        stmt = stmt.where(Trip.departure_date <= date_to)
+
+    rows = db.execute(stmt).all()
+    return [
+        {
+            "trip_id": trip_id,
+            "boat": boat,
+            "departure_date": departure_date,
+            "total_weight_kg": float(total_weight),
+        }
+        for trip_id, boat, departure_date, total_weight in rows
+    ]
+
+
 @app.get("/api/reports/catch-by-trip")
 def catch_report(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     rows = db.execute(
@@ -244,29 +286,3 @@ def catch_report(db: Session = Depends(get_db), _: User = Depends(get_current_us
         {"trip_id": trip_id, "boat": boat, "total_weight_kg": float(total_weight)}
         for trip_id, boat, total_weight in rows
     ]
-
-
-@app.get("/api/reports/catch-by-period")
-def catch_report_by_period(date_from: date, date_to: date, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    if date_to < date_from:
-        raise HTTPException(422, "Дата окончания периода не может быть раньше даты начала")
-    trip_count = db.scalar(
-        select(func.count(Trip.id)).where(Trip.departure_date.between(date_from, date_to))
-    ) or 0
-    total_weight = db.scalar(
-        select(func.coalesce(func.sum(Catch.weight_kg), 0))
-        .join(Trip, Trip.id == Catch.trip_id)
-        .where(Trip.departure_date.between(date_from, date_to))
-    ) or 0
-    total_cans = db.scalar(
-        select(func.coalesce(func.sum(Catch.cans), 0))
-        .join(Trip, Trip.id == Catch.trip_id)
-        .where(Trip.departure_date.between(date_from, date_to))
-    ) or 0
-    return {
-        "date_from": date_from,
-        "date_to": date_to,
-        "trip_count": int(trip_count),
-        "total_weight_kg": float(total_weight),
-        "total_cans": int(total_cans),
-    }

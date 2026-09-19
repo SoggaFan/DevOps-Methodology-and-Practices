@@ -9,14 +9,51 @@ function showMessage(text, error = false) {
   showMessage.timer = window.setTimeout(() => box.classList.add("hidden"), 5000);
 }
 
+const AUTH_KEY = "ff_auth";
+
+function basicToken(username, password) {
+  const bytes = new TextEncoder().encode(`${username}:${password}`);
+  return btoa(String.fromCharCode(...bytes));
+}
+
+const auth = {
+  get token() { try { return sessionStorage.getItem(AUTH_KEY); } catch { return null; } },
+  set(token) { try { sessionStorage.setItem(AUTH_KEY, token); } catch { /* ignore */ } },
+  clear() { try { sessionStorage.removeItem(AUTH_KEY); } catch { /* ignore */ } },
+};
+
+class UnauthorizedError extends Error {}
+
 async function api(path, options = {}) {
-  const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (auth.token && !headers.Authorization) headers.Authorization = `Basic ${auth.token}`;
+  const response = await fetch(path, { ...options, headers });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && path !== "/auth/login") {
+      showLogin("Сессия истекла или данные неверны. Войдите снова.");
+      throw new UnauthorizedError(body.detail || "Требуется вход");
+    }
     const detail = Array.isArray(body.detail) ? body.detail.map(x => x.msg).join("; ") : (body.detail || `HTTP ${response.status}`);
     throw new Error(detail);
   }
   return body;
+}
+
+function showLogin(message) {
+  auth.clear();
+  $("app-section").classList.add("hidden");
+  $("user-box").classList.add("hidden");
+  $("login-section").classList.remove("hidden");
+  const box = $("login-message");
+  if (message) { box.textContent = message; box.classList.remove("hidden"); } else { box.classList.add("hidden"); }
+}
+
+function showApp(user) {
+  $("login-section").classList.add("hidden");
+  $("app-section").classList.remove("hidden");
+  $("user-name").textContent = user.username;
+  $("user-box").classList.remove("hidden");
 }
 
 function formData(form) {
@@ -78,7 +115,7 @@ async function refreshAll() {
     await loadTrips();
     await loadReport();
     await loadHealth();
-  } catch (e) { showMessage(e.message, true); }
+  } catch (e) { if (!(e instanceof UnauthorizedError)) showMessage(e.message, true); }
 }
 
 $("boat-form").addEventListener("submit", async (e) => {
@@ -115,4 +152,34 @@ $("reload-report").onclick = () => loadReport().catch(e => showMessage(e.message
 $("report-from").onchange = () => loadReport().catch(e => showMessage(e.message, true));
 $("report-to").onchange = () => loadReport().catch(e => showMessage(e.message, true));
 
-refreshAll();
+$("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const { username, password } = formData(e.target);
+  try {
+    const user = await api("/auth/login", {
+      method: "POST",
+      headers: { Authorization: `Basic ${basicToken(username, password)}` },
+    });
+    auth.set(basicToken(username, password));
+    e.target.reset();
+    showApp(user);
+    await refreshAll();
+  } catch (err) {
+    showLogin(err.message);
+  }
+});
+
+$("logout-btn").onclick = () => showLogin();
+
+async function init() {
+  loadHealth();
+  if (!auth.token) { showLogin(); return; }
+  try {
+    showApp(await api("/auth/me"));
+    await refreshAll();
+  } catch (e) {
+    if (!(e instanceof UnauthorizedError)) showLogin(e.message);
+  }
+}
+
+init();

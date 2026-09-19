@@ -13,10 +13,26 @@
     <h1>Рыболовная фирма</h1>
     <p class="subtitle">Учёт катеров, команд, рейсов, рыбы и улова</p>
   </div>
-  <div class="status"><span id="health-dot" class="dot"></span><span id="health-text">Проверка БД…</span></div>
+  <div class="header-right">
+    <div class="status"><span id="health-dot" class="dot"></span><span id="health-text">Проверка БД…</span></div>
+    <div id="user-box" class="user-box hidden"><span id="user-name"></span><button class="secondary" id="logout-btn" type="button">Выйти</button></div>
+  </div>
 </header>
 
-<main class="container">
+<main class="container" id="login-section">
+  <section class="card login-card">
+    <h3>Вход в систему</h3>
+    <p class="login-hint">Введите логин и пароль (HTTP Basic). Учётная запись администратора задаётся в <code>.env</code>: <code>ADMIN_USERNAME</code> и <code>ADMIN_PASSWORD</code>.</p>
+    <div id="login-message" class="message error hidden"></div>
+    <form id="login-form" class="form">
+      <label>Логин<input name="username" autocomplete="username" required autofocus></label>
+      <label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
+      <button>Войти</button>
+    </form>
+  </section>
+</main>
+
+<main class="container hidden" id="app-section">
   <section class="hero">
     <div>
       <h2>Рабочая панель</h2>

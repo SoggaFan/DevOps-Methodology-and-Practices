@@ -60,6 +60,21 @@ curl http://localhost:8000/health
 ```
 Затем показать Swagger, таблицы БД и PR/MR.
 
+### Health-check
+
+Для демонстрации работоспособности API используется служебный endpoint:
+
+```text
+GET /health
+```
+Ожидаемый HTTP-код: 200.
+
+Пример проверки:
+
+```bash
+curl http://localhost:8000/health
+```
+
 ## 11. Как связать защиту с ТЗ
 
 Открыть `docs/TECHNICAL_SPECIFICATION.md` и показать матрицу трассируемости в приложении А.
@@ -80,4 +95,4 @@ HTTP 422 при превышении
 ручная проверка через Swagger/curl
 ```
 
-После этого показать FR-09 через `GET /api/reports/catch-by-period`.
+После этого показать FR-09 через `GET /api/reports/catch-by-period`, а защиту доступа — через FR-10…FR-12 (`/auth/login`, `/auth/me`, HTTP 401 без логина и пароля).
