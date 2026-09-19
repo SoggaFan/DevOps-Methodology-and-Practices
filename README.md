@@ -11,6 +11,7 @@
 - Бизнес-правило: суммарная масса улова рейса не может превышать грузоподъемность катера.
 - Обработка ошибок HTTP 404/409/422.
 - `GET /health` с проверкой соединения с БД.
+- Базовая аутентификация пользователей по логину и паролю через HTTP Basic.
 - Отчет по рейсам и отчет за период.
 - Конфигурация через переменные окружения.
 - Docker Compose для API и PostgreSQL.
@@ -64,10 +65,43 @@ SELECT * FROM boats;
 SELECT * FROM crews;
 SELECT * FROM fish_types;
 SELECT * FROM trips;
+SELECT * FROM users;
 SELECT * FROM catches;
 ```
 
+## 4. Аутентификация
+
+Для ЛР1 используется HTTP Basic: логин и пароль передаются в заголовке `Authorization`. Данные администратора задаются в `.env` через `ADMIN_USERNAME` и `ADMIN_PASSWORD` и автоматически создаются в таблице `users`.
+
+Проверить вход можно так:
+
+```bash
+source .env
+curl -s -X POST http://localhost:8000/auth/login \
+  -u "$ADMIN_USERNAME:$ADMIN_PASSWORD"
+```
+
+Проверить защищенный endpoint:
+
+```bash
+curl -i http://localhost:8000/api/boats
+
+curl -s http://localhost:8000/api/boats \
+  -u "$ADMIN_USERNAME:$ADMIN_PASSWORD"
+```
+
+В Swagger (`/docs`) нажмите `Authorize` и введите логин и пароль. После этого Swagger сможет вызывать защищенные `/api/*` endpoints.
+
+Для локальной учебной работы HTTP Basic проще токен-авторизации и не требует отдельного хранения токена на клиенте. В реальной эксплуатации такой способ следует использовать только поверх HTTPS.
+
 ## 4. API
+
+### Аутентификация
+
+- `POST /auth/login` — проверка логина и пароля;
+- `GET /auth/me` — текущий пользователь по HTTP Basic.
+
+Все `/api/*` требуют корректные учетные данные HTTP Basic. `GET /health` остается публичным для health-check.
 
 ### Служебный
 
