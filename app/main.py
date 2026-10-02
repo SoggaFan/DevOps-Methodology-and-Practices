@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import Date, ForeignKey, Numeric, String, Text, create_engine, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://fishing:fishing@localhost:5432/fishing")
@@ -73,7 +74,9 @@ class Catch(Base):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    # Схема БД создается администратором БД отдельно от запуска приложения.
+    # Это позволяет использовать отдельного пользователя приложения с
+    # минимально необходимыми правами без DDL-привилегий.
     yield
 
 
@@ -154,7 +157,13 @@ class CatchOut(CatchIn):
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
-    db.execute(select(1))
+    try:
+        db.execute(select(1))
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="database unavailable",
+        )
     return {"status": "ok", "service": "fishing-firm-api"}
 
 

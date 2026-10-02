@@ -182,3 +182,17 @@ git ls-files .env
 - `make up`
 - `make down`
 - `make container-check`
+
+## 12. Лабораторная работа №2 — Linux deployment
+
+ЛР2 выполняется **без Docker**. Готовая схема, systemd unit, скрипты повторного развертывания и чек-лист приемки находятся в:
+
+- `docs/LR2_DEPLOYMENT.md`
+- `docs/LR2_REQUIREMENTS.md`
+- `deploy/app/fishing-firm.service`
+- `deploy/app/install.sh`
+- `deploy/db/setup-db.sh`
+- `deploy/firewall/app-ufw.sh`
+- `deploy/firewall/db-ufw.sh`
+
+В ЛР2 схема БД создается отдельно администратором PostgreSQL. Приложение не выполняет DDL при старте, что позволяет ограничить права `fishing_app` операциями DML.
