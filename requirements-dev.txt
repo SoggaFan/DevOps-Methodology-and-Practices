@@ -1,0 +1,7 @@
+# Developer/test dependencies; runtime versions are inherited from requirements.txt.
+-r requirements.txt
+httpx==0.28.1
+pytest==8.4.1
+pytest-cov==6.3.0
+ruff==0.13.0
+bandit==1.8.6
