@@ -22,7 +22,7 @@
 
 - `docs/TECHNICAL_SPECIFICATION.md` — формальное ТЗ.
 - `docs/API.md` — описание API.
-- `docs/DB_SCHEMA.md` — схема БД и связи.
+- `docs/DATA_MODEL.md` — схема БД и связи.
 - `docs/GIT_DEFENSE.md` — сценарий защиты Git.
 - `docs/DEMO.md` — пошаговая демонстрация API.
 
@@ -169,19 +169,21 @@ git ls-files .env
 
 Команда не должна выводить `.env`.
 
-## 11. Команды Makefile
+## 11. Команды Makefile и проверочный контур ЛР3
 
-- `make setup`
-- `make run`
-- `make test`
-- `make quality`
-- `make migrate`
-- `make backup`
-- `make restore`
-- `make verify`
-- `make up`
-- `make down`
-- `make container-check`
+Первоначальная настройка и полный проверочный gate:
+
+```bash
+make setup
+make verify
+```
+
+`make verify` включает форматирование и lint (Ruff), SAST (Bandit), unit/API-тесты, отчёт покрытия и JUnit-отчёт. Тесты локально используют изолированную SQLite в памяти, если не задан `TEST_DATABASE_URL`; CI запускает тот же набор на отдельном PostgreSQL `fishing_test`.
+
+Полное описание команд, конфигурации тестовой БД и матрица покрытия ТЗ: `docs/TESTING.md`. Правила недопустимости пропуска тестов и ослабления анализаторов: `docs/QUALITY_RULES.md`. Разделение задач ЛР3 между участниками: `docs/LR3_MY_PART.md`.
+
+Доступные команды: `make setup`, `make run`, `make test`, `make quality`, `make security`, `make coverage`, `make migrate`, `make backup`, `make restore`, `make verify`, `make up`, `make down`, `make container-check`.
+
 
 ## 12. Лабораторная работа №2 — Linux deployment
 

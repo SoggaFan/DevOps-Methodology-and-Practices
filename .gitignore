@@ -1,10 +1,16 @@
-.env
+﻿.env
 .venv/
 __pycache__/
 .pytest_cache/
+.ruff_cache/
 postgres_data/
 backup.sql
+backups/
 *.pyc
+.coverage
+.coverage.*
+htmlcov/
+reports/*.xml
 .idea/
 .vscode/
 .DS_Store

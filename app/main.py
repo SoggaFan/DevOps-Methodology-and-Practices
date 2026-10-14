@@ -11,9 +11,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import Date, ForeignKey, Numeric, String, Text, create_engine, func, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    Session,
+    mapped_column,
+    relationship,
+    sessionmaker,
+)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://fishing:fishing@localhost:5432/fishing")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql+psycopg://fishing:fishing@localhost:5432/fishing"
+)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -58,7 +67,9 @@ class Trip(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     boat: Mapped[Boat] = relationship(back_populates="trips")
     crew: Mapped[Crew] = relationship(back_populates="trips")
-    catches: Mapped[list["Catch"]] = relationship(back_populates="trip", cascade="all, delete-orphan")
+    catches: Mapped[list["Catch"]] = relationship(
+        back_populates="trip", cascade="all, delete-orphan"
+    )
 
 
 class Catch(Base):
@@ -245,7 +256,9 @@ def create_catch(payload: CatchIn, db: Session = Depends(get_db)):
         raise HTTPException(404, "Рейс не найден")
     if not db.get(FishType, payload.fish_type_id):
         raise HTTPException(404, "Сорт рыбы не найден")
-    current_weight = db.scalar(select(func.coalesce(func.sum(Catch.weight_kg), 0)).where(Catch.trip_id == payload.trip_id))
+    current_weight = db.scalar(
+        select(func.coalesce(func.sum(Catch.weight_kg), 0)).where(Catch.trip_id == payload.trip_id)
+    )
     if Decimal(current_weight) + payload.weight_kg > trip.boat.capacity_kg:
         raise HTTPException(422, "Превышена грузоподъемность катера")
     item = Catch(**payload.model_dump())
@@ -266,37 +279,34 @@ def catch_report_by_period(
 
     stmt = (
         select(
-            Trip.id,
-            Boat.name,
-            Trip.departure_date,
+            func.count(func.distinct(Trip.id)).label("trip_count"),
             func.coalesce(func.sum(Catch.weight_kg), 0).label("total_weight_kg"),
+            func.coalesce(func.sum(Catch.cans), 0).label("total_cans"),
         )
-        .join(Boat, Boat.id == Trip.boat_id)
+        .select_from(Trip)
         .outerjoin(Catch, Catch.trip_id == Trip.id)
-        .group_by(Trip.id, Boat.name, Trip.departure_date)
-        .order_by(Trip.departure_date, Trip.id)
     )
     if date_from:
         stmt = stmt.where(Trip.departure_date >= date_from)
     if date_to:
         stmt = stmt.where(Trip.departure_date <= date_to)
 
-    rows = db.execute(stmt).all()
-    return [
-        {
-            "trip_id": trip_id,
-            "boat": boat,
-            "departure_date": departure_date,
-            "total_weight_kg": float(total_weight),
-        }
-        for trip_id, boat, departure_date, total_weight in rows
-    ]
+    row = db.execute(stmt).one()
+    return {
+        "trip_count": row.trip_count,
+        "total_weight_kg": float(row.total_weight_kg),
+        "total_cans": row.total_cans,
+    }
 
 
 @app.get("/api/reports/catch-by-trip")
 def catch_report(db: Session = Depends(get_db)):
     rows = db.execute(
-        select(Trip.id, Boat.name, func.coalesce(func.sum(Catch.weight_kg), 0).label("total_weight_kg"))
+        select(
+            Trip.id,
+            Boat.name,
+            func.coalesce(func.sum(Catch.weight_kg), 0).label("total_weight_kg"),
+        )
         .join(Boat, Boat.id == Trip.boat_id)
         .outerjoin(Catch, Catch.trip_id == Trip.id)
         .group_by(Trip.id, Boat.name)
