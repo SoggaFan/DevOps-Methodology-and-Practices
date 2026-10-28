@@ -103,6 +103,12 @@ def test_health_checks_database(client: TestClient) -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_instance_id_header_is_present(client: TestClient) -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers.get("x-instance-id")
+
+
 def test_health_reports_database_error_as_503(client: TestClient) -> None:
     class UnavailableDatabase:
         def execute(self, *_args: Any, **_kwargs: Any) -> None:

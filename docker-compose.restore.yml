@@ -1,0 +1,35 @@
+# Isolated target used only by `make restore-new-volume`.
+# This file intentionally has no schema/seed SQL mounts, so a dump is restored into an empty DB.
+services:
+  db:
+    image: postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fishing}
+      POSTGRES_USER: ${POSTGRES_USER:-fishing_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
+    volumes:
+      - restore_data:/var/lib/postgresql/data
+      - ./sql/000_create_app_user.sql:/docker-entrypoint-initdb.d/000_create_app_user.sql:ro
+      - ./sql/003_grants.sql:/container-grants.sql:ro
+    networks:
+      - restore_backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  restore_data:
+
+networks:
+  restore_backend:
+    driver: bridge
+    internal: true

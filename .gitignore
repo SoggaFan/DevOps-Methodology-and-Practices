@@ -1,4 +1,4 @@
-﻿.env
+.env
 .venv/
 __pycache__/
 .pytest_cache/
@@ -6,6 +6,7 @@ __pycache__/
 postgres_data/
 backup.sql
 backups/
+*.dump
 *.pyc
 .coverage
 .coverage.*

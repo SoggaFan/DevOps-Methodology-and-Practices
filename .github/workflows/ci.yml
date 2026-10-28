@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
         env:
           POSTGRES_DB: fishing_test
           POSTGRES_USER: postgres
@@ -27,13 +27,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
           cache: pip
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
       - name: Initial setup
         run: make setup
+      - name: Prepare local Compose settings for policy checks
+        run: cp .env.example .env
+      - name: Container configuration gate
+        run: make container-check
       - name: Required verification gate
         run: make verify
       - name: Upload test and coverage reports

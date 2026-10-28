@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import Date, ForeignKey, Numeric, String, Text, create_engine, func, select
+from sqlalchemy.engine import URL
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -20,11 +21,24 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+psycopg://fishing:fishing@localhost:5432/fishing"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    database_url: str | URL = DATABASE_URL
+elif "DB_PASSWORD" in os.environ:
+    # URL.create safely handles password characters that need URL escaping.
+    database_url = URL.create(
+        "postgresql+psycopg",
+        username=os.getenv("DB_USER", "fishing_app"),
+        password=os.environ["DB_PASSWORD"],
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        database=os.getenv("DB_NAME", "fishing"),
+    )
+else:
+    # Backwards-compatible default for non-container local development.
+    database_url = "postgresql+psycopg://fishing:fishing@localhost:5432/fishing"
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
@@ -92,6 +106,17 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Fishing Firm API", version="0.1.0", lifespan=lifespan)
+INSTANCE_ID = os.getenv("INSTANCE_ID", os.getenv("HOSTNAME", "local"))
+
+
+@app.middleware("http")
+async def add_instance_id_header(request, call_next):
+    """Expose the responding instance for the optional Nginx scaling exercise."""
+    response = await call_next(request)
+    response.headers["X-Instance-ID"] = INSTANCE_ID
+    return response
+
+
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 

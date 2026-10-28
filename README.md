@@ -28,44 +28,29 @@
 
 ## 3. Быстрый запуск
 
+Инструкция по полноценному запуску, учётной записи приложения, volume и проверкам находится в `docs/LR4_CONTAINERIZATION.md`.
+
 ```bash
+# Только если .env ещё не существует. Существующий .env не перезаписывайте.
 cp .env.example .env
+# добавьте отдельный POSTGRES_APP_PASSWORD в .env
 make up
+make db-bootstrap
+make migrate
 make container-check
 ```
 
-Swagger UI:
-
-```text
-http://localhost:8000/docs
-```
-
-Проверка:
-
-```bash
-curl http://localhost:8000/health
-```
-
-Ожидается HTTP 200 и JSON с `status = ok`.
+Swagger UI: `http://127.0.0.1:8000/docs`. Проверка: `curl http://127.0.0.1:8000/health` (ожидается HTTP 200 и JSON со `status = ok`).
 
 ### БД
 
-База доступна внутри Docker-сети. Для защиты:
+PostgreSQL не публикует порт на хост. Для доступа используйте контейнер администратора:
 
 ```bash
-docker compose exec db psql -U fishing -d fishing
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
-Внутри:
-
-```sql
-\dt
-SELECT * FROM boats;
-SELECT * FROM crews;
-SELECT * FROM fish_types;
-SELECT * FROM trips;
-SELECT * FROM catches;
-```
+Внутри `psql`: `\dt`, затем `SELECT * FROM boats;`, `SELECT * FROM crews;`, `SELECT * FROM fish_types;`, `SELECT * FROM trips;`, `SELECT * FROM catches;`.
 
 ## 4. API
 
@@ -182,7 +167,7 @@ make verify
 
 Полное описание команд, конфигурации тестовой БД и матрица покрытия ТЗ: `docs/TESTING.md`. Правила недопустимости пропуска тестов и ослабления анализаторов: `docs/QUALITY_RULES.md`. Разделение задач ЛР3 между участниками: `docs/LR3_MY_PART.md`.
 
-Доступные команды: `make setup`, `make run`, `make test`, `make quality`, `make security`, `make coverage`, `make migrate`, `make backup`, `make restore`, `make verify`, `make up`, `make down`, `make container-check`.
+Доступные команды: `make setup`, `make run`, `make test`, `make quality`, `make security`, `make coverage`, `make migrate`, `make backup`, `make restore`, `make restore-new-volume`, `make verify`, `make up`, `make down`, `make container-check`, `make container-persistence-check`, `make scale-up`, `make scale-check`, `make scale-down`.
 
 
 ## 12. Лабораторная работа №2 — Linux deployment
@@ -198,3 +183,14 @@ make verify
 - `deploy/firewall/db-ufw.sh`
 
 В ЛР2 схема БД создается отдельно администратором PostgreSQL. Приложение не выполняет DDL при старте, что позволяет ограничить права `fishing_app` операциями DML.
+
+## 13. Лабораторная работа №4 — Containerization
+
+- `Dockerfile` и `.dockerignore` закрепляют базовый image, запускают API от UID `10001` и не включают секреты в образ.
+- `docker-compose.yml` задаёт внутреннюю сеть, named volume, healthchecks, лимиты ресурсов и закрытый порт БД.
+- `make container-check` проверяет политики конфигурации и запущенных контейнеров.
+- `make container-persistence-check` проверяет пересоздание контейнеров/образа, сохранность данных и завершение по SIGTERM. Запускать только на учебной VM.
+- `make restore-new-volume` восстанавливает backup в отдельный новый volume.
+- Дополнительный профиль Nginx и два API-экземпляра: `make scale-up`, `make scale-check`, `make scale-down`.
+
+Полная матрица требований и сценарий защиты: `docs/LR4_CONTAINERIZATION.md`.
