@@ -2,19 +2,221 @@ name: CI
 
 on:
   push:
+    branches: [main, master, "**"]
   pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
 
 jobs:
-  verify:
+  style:
+    name: style
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Quality checks
-        run: make quality
-      - name: Tests
-        run: make test
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - run: make setup
+      - run: make quality
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_DB: fishing_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fishing_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/fishing_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - run: make setup
+      - run: make test
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
+          if-no-files-found: warn
+
+  migration:
+    name: migration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_DB: fishing_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fishing_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fishing_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Create least-privilege application role
+        run: psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE fishing_app LOGIN PASSWORD 'ci-only-password';"
+      - name: Apply schema, seed data and grants
+        run: make migration-check
+
+  backup:
+    name: backup
+    runs-on: ubuntu-latest
+    needs: [migration]
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_DB: fishing_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fishing_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fishing_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Prepare disposable database
+        run: |
+          psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE fishing_app LOGIN PASSWORD 'ci-only-password';"
+          make migration-check
+      - name: Create and validate database backup
+        run: make backup-check
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-backup
+          path: reports/ci-backup.dump
+          if-no-files-found: error
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependency auditor
+        run: python -m pip install pip-audit
+      - name: Audit runtime and development dependencies
+        run: pip-audit -r requirements-dev.txt
+      - name: SAST
+        run: |
+          python -m pip install -r requirements-dev.txt
+          make security
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image tagged with commit SHA
+        run: docker build --pull -t fishing-firm:${GITHUB_SHA} .
+      - name: Save image for independent scanning
+        run: docker save fishing-firm:${GITHUB_SHA} -o fishing-firm-image.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-image
+          path: fishing-firm-image.tar
+          if-no-files-found: error
+
+  container-check:
+    name: container-check
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and Docker policies
+        run: |
+          cp .env.example .env
+          make container-check
+      - uses: actions/download-artifact@v4
+        with:
+          name: container-image
+      - name: Load image
+        run: docker load --input fishing-firm-image.tar
+      - name: Scan container image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: fishing-firm:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+      - name: Export image metadata
+        run: docker image inspect fishing-firm:${GITHUB_SHA} --format '{{.Id}}'
+
+  publish:
+    name: publish-image
+    runs-on: ubuntu-latest
+    needs: [style, tests, migration, backup, security, build, container-check]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and publish immutable commit tag
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/fishing-firm:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/fishing-firm:latest

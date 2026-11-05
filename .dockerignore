@@ -1,0 +1,29 @@
+# Git metadata and local configuration must never enter the build context.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Development environments and caches.
+.venv
+venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+reports/
+
+# Local database contents and backups.
+postgres_data/
+backups/
+backup.sql
+*.dump
+
+# Tests and documentation are not runtime dependencies.
+tests/
+docs/
+deploy/

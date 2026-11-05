@@ -1,0 +1,10 @@
+/Makefile                 @SoggaFan @OakimPala
+/pyproject.toml           @SoggaFan @OakimPala
+/requirements*.txt        @SoggaFan @OakimPala
+/tests/                   @SoggaFan @OakimPala
+/.github/workflows/       @SoggaFan @OakimPala
+/.github/CODEOWNERS       @SoggaFan @OakimPala
+/Dockerfile               @SoggaFan @OakimPala
+/docker-compose*.yml      @SoggaFan @OakimPala
+/sql/                     @SoggaFan @OakimPala
+/scripts/container_check.py @SoggaFan @OakimPala

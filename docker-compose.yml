@@ -1,28 +1,79 @@
+name: fishing-firm-lab
+
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fishing}
-      POSTGRES_USER: ${POSTGRES_USER:-fishing}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fishing}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-fishing_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - backend
+    # Do not publish 5432 on the host. The database is reachable only over backend.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fishing} -d ${POSTGRES_DB:-fishing}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+
   api:
-    build: .
+    image: fishing-firm-api:0.4.0
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fishing}:${POSTGRES_PASSWORD:-fishing}@db:5432/${POSTGRES_DB:-fishing}
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-fishing}
+      DB_USER: fishing_app
+      DB_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
+      INSTANCE_ID: api-single
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    cpus: 1.0
+    mem_limit: 256m
+    pids_limit: 128
+
+networks:
+  backend:
+    driver: bridge
+    internal: true
+  frontend:
+    driver: bridge
+
 volumes:
   postgres_data:
+    name: fishing-firm-lab-postgres-data

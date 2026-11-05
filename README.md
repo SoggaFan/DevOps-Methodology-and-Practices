@@ -22,50 +22,35 @@
 
 - `docs/TECHNICAL_SPECIFICATION.md` — формальное ТЗ.
 - `docs/API.md` — описание API.
-- `docs/DB_SCHEMA.md` — схема БД и связи.
+- `docs/DATA_MODEL.md` — схема БД и связи.
 - `docs/GIT_DEFENSE.md` — сценарий защиты Git.
 - `docs/DEMO.md` — пошаговая демонстрация API.
 
 ## 3. Быстрый запуск
 
+Инструкция по полноценному запуску, учётной записи приложения, volume и проверкам находится в `docs/LR4_CONTAINERIZATION.md`.
+
 ```bash
+# Только если .env ещё не существует. Существующий .env не перезаписывайте.
 cp .env.example .env
+# добавьте отдельный POSTGRES_APP_PASSWORD в .env
 make up
+make db-bootstrap
+make migrate
 make container-check
 ```
 
-Swagger UI:
-
-```text
-http://localhost:8000/docs
-```
-
-Проверка:
-
-```bash
-curl http://localhost:8000/health
-```
-
-Ожидается HTTP 200 и JSON с `status = ok`.
+Swagger UI: `http://127.0.0.1:8000/docs`. Проверка: `curl http://127.0.0.1:8000/health` (ожидается HTTP 200 и JSON со `status = ok`).
 
 ### БД
 
-База доступна внутри Docker-сети. Для защиты:
+PostgreSQL не публикует порт на хост. Для доступа используйте контейнер администратора:
 
 ```bash
-docker compose exec db psql -U fishing -d fishing
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
-Внутри:
-
-```sql
-\dt
-SELECT * FROM boats;
-SELECT * FROM crews;
-SELECT * FROM fish_types;
-SELECT * FROM trips;
-SELECT * FROM catches;
-```
+Внутри `psql`: `\dt`, затем `SELECT * FROM boats;`, `SELECT * FROM crews;`, `SELECT * FROM fish_types;`, `SELECT * FROM trips;`, `SELECT * FROM catches;`.
 
 ## 4. API
 
@@ -169,16 +154,48 @@ git ls-files .env
 
 Команда не должна выводить `.env`.
 
-## 11. Команды Makefile
+## 11. Команды Makefile и проверочный контур ЛР3
 
-- `make setup`
-- `make run`
-- `make test`
-- `make quality`
-- `make migrate`
-- `make backup`
-- `make restore`
-- `make verify`
-- `make up`
-- `make down`
-- `make container-check`
+Первоначальная настройка и полный проверочный gate:
+
+```bash
+make setup
+make verify
+```
+
+`make verify` включает форматирование и lint (Ruff), SAST (Bandit), unit/API-тесты, отчёт покрытия и JUnit-отчёт. Тесты локально используют изолированную SQLite в памяти, если не задан `TEST_DATABASE_URL`; CI запускает тот же набор на отдельном PostgreSQL `fishing_test`.
+
+Полное описание команд, конфигурации тестовой БД и матрица покрытия ТЗ: `docs/TESTING.md`. Правила недопустимости пропуска тестов и ослабления анализаторов: `docs/QUALITY_RULES.md`. Разделение задач ЛР3 между участниками: `docs/LR3_MY_PART.md`.
+
+Доступные команды: `make setup`, `make run`, `make test`, `make quality`, `make security`, `make coverage`, `make migrate`, `make backup`, `make restore`, `make restore-new-volume`, `make verify`, `make up`, `make down`, `make container-check`, `make container-persistence-check`, `make scale-up`, `make scale-check`, `make scale-down`.
+
+
+## 12. Лабораторная работа №2 — Linux deployment
+
+ЛР2 выполняется **без Docker**. Готовая схема, systemd unit, скрипты повторного развертывания и чек-лист приемки находятся в:
+
+- `docs/LR2_DEPLOYMENT.md`
+- `docs/LR2_REQUIREMENTS.md`
+- `deploy/app/fishing-firm.service`
+- `deploy/app/install.sh`
+- `deploy/db/setup-db.sh`
+- `deploy/firewall/app-ufw.sh`
+- `deploy/firewall/db-ufw.sh`
+
+В ЛР2 схема БД создается отдельно администратором PostgreSQL. Приложение не выполняет DDL при старте, что позволяет ограничить права `fishing_app` операциями DML.
+
+## 13. Лабораторная работа №4 — Containerization
+
+- `Dockerfile` и `.dockerignore` закрепляют базовый image, запускают API от UID `10001` и не включают секреты в образ.
+- `docker-compose.yml` задаёт внутреннюю сеть, named volume, healthchecks, лимиты ресурсов и закрытый порт БД.
+- `make container-check` проверяет политики конфигурации и запущенных контейнеров.
+- `make container-persistence-check` проверяет пересоздание контейнеров/образа, сохранность данных и завершение по SIGTERM. Запускать только на учебной VM.
+- `make restore-new-volume` восстанавливает backup в отдельный новый volume.
+- Дополнительный профиль Nginx и два API-экземпляра: `make scale-up`, `make scale-check`, `make scale-down`.
+
+Полная матрица требований и сценарий защиты: `docs/LR4_CONTAINERIZATION.md`.
+
+
+## 14. Лабораторная работа №5 — Continuous Integration
+
+CI настроен через GitHub Actions: проверки стиля, тесты на отдельной PostgreSQL БД, миграции и backup, поиск секретов, аудит зависимостей, SAST, проверка Docker-образа и публикация в Docker Hub только после успешных обязательных jobs. Настройка secrets, branch protection, CODEOWNERS и сценарии защиты: `docs/LR5_CONTINUOUS_INTEGRATION.md`.

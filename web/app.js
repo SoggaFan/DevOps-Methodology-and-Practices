@@ -64,8 +64,8 @@ async function loadReport() {
   const params = new URLSearchParams();
   if ($("report-from").value) params.set("date_from", $("report-from").value);
   if ($("report-to").value) params.set("date_to", $("report-to").value);
-  const rows = await api(`/api/reports/catch-by-period${params.toString() ? `?${params}` : ""}`);
-  renderTable($("report-list"), ["Рейс", "Катер", "Дата выхода", "Вес улова, кг"], rows.map(x => [x.trip_id, x.boat, x.departure_date, x.total_weight_kg]));
+  const summary = await api(`/api/reports/catch-by-period${params.toString() ? `?${params}` : ""}`);
+  renderTable($("report-list"), ["Количество рейсов", "Общий улов, кг", "Количество банок"], [[summary.trip_count, summary.total_weight_kg, summary.total_cans]]);
 }
 async function loadHealth() {
   try { await api("/health"); $("health-dot").style.background = "#48bb78"; $("health-text").textContent = "БД и API работают"; }
