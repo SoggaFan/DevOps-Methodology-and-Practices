@@ -1,4 +1,4 @@
-.PHONY: setup run test quality security coverage migrate db-bootstrap backup restore restore-new-volume verify up down container-check container-persistence-check scale-up scale-check scale-down
+.PHONY: setup run test quality security coverage migrate db-bootstrap backup restore restore-new-volume verify up down container-check container-persistence-check scale-up scale-check scale-down migration-check backup-check
 
 PYTHON ?= python3
 VENV_PYTHON := .venv/bin/python
@@ -87,3 +87,20 @@ scale-check:
 scale-down: container-check
 	docker compose -f docker-compose.yml -f docker-compose.scale.yml --profile scale down
 	docker compose up --build -d
+
+
+# CI/local migration verification against an explicitly selected disposable DB.
+# Set MIGRATION_DATABASE_URL; the target never guesses a production database.
+migration-check:
+	@test -n "$(MIGRATION_DATABASE_URL)" || { echo "Set MIGRATION_DATABASE_URL to a disposable database"; exit 2; }
+	psql "$(MIGRATION_DATABASE_URL)" -v ON_ERROR_STOP=1 -f sql/001_schema.sql
+	psql "$(MIGRATION_DATABASE_URL)" -v ON_ERROR_STOP=1 -f sql/002_seed.sql
+	psql "$(MIGRATION_DATABASE_URL)" -v ON_ERROR_STOP=1 -f sql/003_grants.sql
+
+# Produce a custom-format backup and verify that PostgreSQL can read its TOC.
+backup-check:
+	@test -n "$(MIGRATION_DATABASE_URL)" || { echo "Set MIGRATION_DATABASE_URL to a disposable database"; exit 2; }
+	mkdir -p reports
+	pg_dump --format=custom --no-owner --no-privileges --dbname="$(MIGRATION_DATABASE_URL)" --file=reports/ci-backup.dump
+	pg_restore --list reports/ci-backup.dump >/dev/null
+	@echo "Backup created and archive TOC validated."

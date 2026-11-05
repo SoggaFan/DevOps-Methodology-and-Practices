@@ -194,3 +194,8 @@ make verify
 - Дополнительный профиль Nginx и два API-экземпляра: `make scale-up`, `make scale-check`, `make scale-down`.
 
 Полная матрица требований и сценарий защиты: `docs/LR4_CONTAINERIZATION.md`.
+
+
+## 14. Лабораторная работа №5 — Continuous Integration
+
+CI настроен через GitHub Actions: проверки стиля, тесты на отдельной PostgreSQL БД, миграции и backup, поиск секретов, аудит зависимостей, SAST, проверка Docker-образа и публикация в Docker Hub только после успешных обязательных jobs. Настройка secrets, branch protection, CODEOWNERS и сценарии защиты: `docs/LR5_CONTINUOUS_INTEGRATION.md`.
