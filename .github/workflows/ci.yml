@@ -90,12 +90,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y curl ca-certificates gnupg
-
           sudo install -d /usr/share/postgresql-common/pgdg
 
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          curl -fsSL \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /tmp/pgdg.asc
+
+          sudo gpg --batch --yes --dearmor \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+            /tmp/pgdg.asc
 
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
@@ -133,12 +136,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y curl ca-certificates gnupg
-
           sudo install -d /usr/share/postgresql-common/pgdg
 
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          curl -fsSL \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /tmp/pgdg.asc
+
+          sudo gpg --batch --yes --dearmor \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+            /tmp/pgdg.asc
 
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
@@ -156,12 +162,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y curl ca-certificates gnupg
-
           sudo install -d /usr/share/postgresql-common/pgdg
 
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          curl -fsSL \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /tmp/pgdg.asc
+
+          sudo gpg --batch --yes --dearmor \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+            /tmp/pgdg.asc
 
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
@@ -206,7 +215,7 @@ jobs:
         run: pip-audit -r requirements-dev.txt
       - name: SAST
         run: |
-          python -m pip install -r requirements-dev.txt
+          make setup
           make security
 
   build:
