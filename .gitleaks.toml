@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Allow placeholder credentials in documentation examples"
+paths = [
+  '''docs/API\.md''',
+  '''docs/DEMO\.md'''
+]
