@@ -86,8 +86,25 @@ jobs:
       MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fishing_ci
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Install PostgreSQL Client 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
       - name: Create least-privilege application role
         run: psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE fishing_app LOGIN PASSWORD 'ci-only-password';"
       - name: Apply schema, seed data and grants
@@ -112,12 +129,48 @@ jobs:
       MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fishing_ci
     steps:
       - uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Install PostgreSQL Client 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
       - name: Prepare disposable database
         run: |
           psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE fishing_app LOGIN PASSWORD 'ci-only-password';"
           make migration-check
+      - name: Install PostgreSQL Client 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
       - name: Create and validate database backup
         run: make backup-check
       - name: Upload backup artifact
@@ -187,7 +240,7 @@ jobs:
       - name: Load image
         run: docker load --input fishing-firm-image.tar
       - name: Scan container image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: fishing-firm:${{ github.sha }}
           format: table
