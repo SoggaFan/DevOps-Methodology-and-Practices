@@ -1,0 +1,70 @@
+name: fishing-firm-preprod
+
+services:
+  db:
+    image: postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the pre-production environment file}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the pre-production environment file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the pre-production environment file}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in the pre-production environment file}
+    volumes:
+      - preprod_postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    image: ${IMAGE_REPOSITORY:?Set IMAGE_REPOSITORY}:${IMAGE_TAG:?Set IMAGE_TAG}
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:?Set POSTGRES_DB}
+      DB_USER: fishing_app
+      DB_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
+      INSTANCE_ID: preprod-api
+      APP_VERSION: ${APP_VERSION:?Set APP_VERSION}
+      APP_COMMIT: ${APP_COMMIT:?Set APP_COMMIT}
+    ports:
+      - "127.0.0.1:${APP_PORT:?Set APP_PORT in the pre-production environment file}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend, frontend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    cpus: 1.0
+    mem_limit: 256m
+    pids_limit: 128
+
+networks:
+  backend:
+    driver: bridge
+    internal: true
+  frontend:
+    driver: bridge
+
+volumes:
+  preprod_postgres_data:
+    name: fishing-firm-preprod-postgres-data

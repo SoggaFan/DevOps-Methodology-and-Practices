@@ -4,7 +4,17 @@ Base URL: `http://localhost:8000`
 
 Документация FastAPI: `GET /docs` и `GET /openapi.json`.
 
-## Служебный endpoint
+## Служебные endpoints
+
+### GET `/version`
+
+Возвращает версию образа и commit SHA, переданные в контейнер через `APP_VERSION` и `APP_COMMIT`. В локальном режиме по умолчанию возвращает `0.0.0-dev` и `unknown`.
+
+Пример ответа:
+
+```json
+{"version":"<commit-sha>","commit":"<commit-sha>"}
+```
 
 ### GET `/health`
 

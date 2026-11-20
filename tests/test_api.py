@@ -97,6 +97,12 @@ def test_static_assets_are_served(client: TestClient) -> None:
     assert "site-header" in response.text
 
 
+def test_version_endpoint_returns_release_identity(client: TestClient) -> None:
+    response = client.get("/version")
+    assert response.status_code == 200
+    assert response.json() == {"version": "0.0.0-dev", "commit": "unknown"}
+
+
 def test_health_checks_database(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200

@@ -15,3 +15,6 @@ reports/*.xml
 .idea/
 .vscode/
 .DS_Store
+# Pre-production host configuration is never committed.
+deploy/preprod/.env
+.venv312/

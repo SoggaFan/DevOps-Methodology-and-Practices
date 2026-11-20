@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not cancel an in-progress main-branch run: it may be performing a release.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   PYTHON_VERSION: "3.12"
@@ -282,3 +283,56 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/fishing-firm:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/fishing-firm:latest
+
+  deploy-preprod:
+    name: deploy-preprod
+    runs-on: ubuntu-latest
+    needs: [publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: preproduction
+    concurrency:
+      group: preproduction-deployment
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ vars.PREPROD_HOST }}
+          DEPLOY_PORT: ${{ vars.PREPROD_PORT || '22' }}
+          DEPLOY_USER: ${{ vars.PREPROD_USER || 'fishing-deploy' }}
+          SSH_PRIVATE_KEY: ${{ secrets.PREPROD_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PREPROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST" || { echo "PREPROD_HOST is missing"; exit 1; }
+          test -n "$SSH_PRIVATE_KEY" || { echo "PREPROD_SSH_KEY is missing"; exit 1; }
+          test -n "$SSH_KNOWN_HOSTS" || { echo "PREPROD_KNOWN_HOSTS is missing"; exit 1; }
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]] || { echo "PREPROD_PORT must be numeric"; exit 1; }
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/preprod_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/preprod_ed25519" "$HOME/.ssh/known_hosts"
+          echo "DEPLOY_HOST=$DEPLOY_HOST" >> "$GITHUB_ENV"
+          echo "DEPLOY_PORT=$DEPLOY_PORT" >> "$GITHUB_ENV"
+          echo "DEPLOY_USER=$DEPLOY_USER" >> "$GITHUB_ENV"
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Deploy published image by immutable commit tag
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/preprod_ed25519" \
+            -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo /usr/local/sbin/fishing-preprod-release deploy $IMAGE_TAG"

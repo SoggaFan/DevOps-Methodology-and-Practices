@@ -11,6 +11,7 @@
 - Бизнес-правило: суммарная масса улова рейса не может превышать грузоподъемность катера.
 - Обработка ошибок HTTP 404/409/422.
 - `GET /health` с проверкой соединения с БД.
+- `GET /version` с версией и commit SHA работающего релиза.
 - Отчет по рейсам и отчет за период.
 - Конфигурация через переменные окружения.
 - Docker Compose для API и PostgreSQL.
@@ -199,3 +200,7 @@ make verify
 ## 14. Лабораторная работа №5 — Continuous Integration
 
 CI настроен через GitHub Actions: проверки стиля, тесты на отдельной PostgreSQL БД, миграции и backup, поиск секретов, аудит зависимостей, SAST, проверка Docker-образа и публикация в Docker Hub только после успешных обязательных jobs. Настройка secrets, branch protection, CODEOWNERS и сценарии защиты: `docs/LR5_CONTINUOUS_INTEGRATION.md`.
+
+## 15. Лабораторная работа №6 — Continuous Delivery
+
+После успешной публикации commit-SHA образа в Docker Hub workflow автоматически разворачивает его в отдельном pre-production Compose-проекте. На целевом сервере выполняется только pull; конфигурация и пароли хранятся отдельно от образа. Выпуск принимается только после healthcheck, `/health`, `/version` и read-only smoke-check основных API-сценариев. Неуспешная проверка вызывает rollback и оставляет deploy job красным. Ручное развертывание SHA и возврат предыдущего релиза: `docs/LR6_CONTINUOUS_DELIVERY.md`.

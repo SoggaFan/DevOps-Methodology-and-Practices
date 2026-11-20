@@ -105,7 +105,9 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Fishing Firm API", version="0.1.0", lifespan=lifespan)
+APP_VERSION = os.getenv("APP_VERSION", "0.0.0-dev")
+APP_COMMIT = os.getenv("APP_COMMIT", "unknown")
+app = FastAPI(title="Fishing Firm API", version=APP_VERSION, lifespan=lifespan)
 INSTANCE_ID = os.getenv("INSTANCE_ID", os.getenv("HOSTNAME", "local"))
 
 
@@ -189,6 +191,12 @@ class CatchIn(BaseModel):
 
 class CatchOut(CatchIn):
     id: int
+
+
+@app.get("/version")
+def version():
+    """Return the immutable release identity supplied by the deployment environment."""
+    return {"version": APP_VERSION, "commit": APP_COMMIT}
 
 
 @app.get("/health")

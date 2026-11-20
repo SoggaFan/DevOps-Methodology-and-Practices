@@ -8,3 +8,5 @@
 /docker-compose*.yml      @SoggaFan @OakimPala
 /sql/                     @SoggaFan @OakimPala
 /scripts/container_check.py @SoggaFan @OakimPala
+/deploy/preprod/ @SoggaFan @OakimPala
+/docs/LR6_CONTINUOUS_DELIVERY.md @SoggaFan @OakimPala
